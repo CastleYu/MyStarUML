@@ -61,8 +61,8 @@ function getImageData(diagram, type) {
     var h = canvasElement.height;
     canvas.ratio = window.devicePixelRatio;
     console.log(`获取屏幕缩放比例为${canvas.ratio}`)
-    canvasElement.width = w * canvas.ratio * 4;
-    canvasElement.height = h * canvas.ratio * 4;
+    canvasElement.width = w * canvas.ratio;
+    canvasElement.height = h * canvas.ratio;
     console.log(`输出一个${canvasElement.width}x${canvasElement.height}的图片`)
     canvasElement.style.width = w + "px";
     canvasElement.style.height = h + "px";
