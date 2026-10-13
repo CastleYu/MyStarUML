@@ -1,6 +1,6 @@
 const semver = require('semver')
 const path = require('path')
-const request = require('request')
+const downloadBuffer = require('../utils/download-buffer')
 const fs = require('fs-extra')
 const temp = require('temp')
 const validate = require('./package-validator').validate
@@ -326,9 +326,10 @@ function update (packagePath, destinationDirectory, options, callback) {
  */
 function _endDownload (downloadId, error) {
   var downloadInfo = pendingDownloads[downloadId]
-  delete pendingDownloads[downloadId]
+  if (!downloadInfo) return
 
   if (error) {
+    delete pendingDownloads[downloadId]
     // Abort the download if still pending
     // Note that this will trigger response's "end" event
     downloadInfo.request.abort()
@@ -336,15 +337,18 @@ function _endDownload (downloadId, error) {
     // Clean up any partially-downloaded file
     // (if no outStream, then we never got a response back yet and never created any file)
     if (downloadInfo.outStream) {
-      downloadInfo.outStream.end(function () {
-        fs.unlink(downloadInfo.localPath)
+      downloadInfo.outStream.once('close', function () {
+        fs.unlink(downloadInfo.localPath, function () {})
       })
+      downloadInfo.outStream.destroy()
     }
 
     downloadInfo.callback(error, null)
   } else {
     // Download completed successfully. Flush stream to disk and THEN signal completion
     downloadInfo.outStream.end(function () {
+      if (pendingDownloads[downloadId] !== downloadInfo) return
+      delete pendingDownloads[downloadId]
       downloadInfo.callback(null, downloadInfo.localPath)
     })
   }
@@ -366,11 +370,7 @@ function downloadFile (downloadId, url, proxy, callback) {
     return
   }
 
-  var req = request.get({
-    url: url,
-    encoding: null,
-    proxy: proxy
-  },
+  var req = downloadBuffer(url, proxy,
   // Note: we could use the traditional "response"/"data"/"end" events too if we wanted to stream data
   // incrementally, limit download size, etc. - but the simple callback is good enough for our needs.
   function (error, response, body) {
@@ -384,13 +384,20 @@ function downloadFile (downloadId, url, proxy, callback) {
       return
     }
 
-    var stream = temp.createWriteStream('brackets')
+    var stream
+    try {
+      stream = temp.createWriteStream('brackets')
+    } catch (error) {
+      _endDownload(downloadId, Errors.CANNOT_WRITE_TEMP)
+      return
+    }
     if (!stream) {
       _endDownload(downloadId, Errors.CANNOT_WRITE_TEMP)
       return
     }
     pendingDownloads[downloadId].localPath = stream.path
     pendingDownloads[downloadId].outStream = stream
+    stream.on('error', () => _endDownload(downloadId, Errors.CANNOT_WRITE_TEMP))
 
     stream.write(body)
     _endDownload(downloadId)
