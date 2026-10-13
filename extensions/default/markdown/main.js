@@ -21,12 +21,12 @@
 *
 */
 
-/* global CodeMirror, markdown */
+/* global CodeMirror */
 
 const fs = require('fs')
 const path = require('path')
 
-require('./markdown.min')
+const renderMarkdown = require('../../../src/utils/render-markdown')
 
 var markdownPanelTemplate = fs.readFileSync(path.join(__dirname, 'markdown-panel.html'), 'utf8')
 var markdownPanel
@@ -99,7 +99,7 @@ function setMode (mode) {
 
 function renderPreview () {
   if (_currentElement && _currentElement.documentation) {
-    $markdownPreview.html("<div style='margin: 10px'>" + markdown.toHTML(_currentElement.documentation) + '</div>')
+    $markdownPreview.html("<div style='margin: 10px'>" + renderMarkdown(_currentElement.documentation) + '</div>')
   } else {
     $markdownPreview.html('')
   }

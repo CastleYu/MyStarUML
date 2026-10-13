@@ -1,0 +1,19 @@
+name: Security regression
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  markdown:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [16, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: node test/security-regression.cjs
